@@ -1,0 +1,114 @@
+
+services:
+
+
+
+  web:
+    build:
+      context: ./apps/web
+      
+  redis:
+    image: redis:8-alpine
+
+    env_file:
+      - ./apps/api/.env
+
+    # entrypoint: ["/bin/sh", "-c"]
+
+    # command:
+    #   - |
+    #     set -eu
+    #     : "$${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+    #     exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes
+
+    ports:
+      - "127.0.1.1:6379:6379"
+
+    volumes:
+      - app-data-local-redis:/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG'
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - orbit-network
+
+    restart: unless-stopped
+    
+
+  postgres:
+    image: postgres:18-alpine
+
+    ports:
+      - "127.0.0.1:5433:5432"
+
+
+    env_file:
+      - ./apps/api/.env
+    
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - orbit-network
+
+    
+    volumes:
+      - app-data-local-postgres:/var/lib/postgresql/18/docker
+
+
+          # create databse automatically when start fresh new one container 
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+
+
+      # UI base Work on postgres DB
+
+  pgadmin4:
+    image: dpage/pgadmin4
+
+    entrypoint: /entrypoint.sh
+
+    ports:
+      - "0.0.0.0:5050:80"
+
+    env_file:
+      - ./apps/api/.env
+
+    networks:
+      - orbit-network
+
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin/
+     # - ./servers.json:/pgadmin4/servers.json:ro
+
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      
+      
+    
+
+networks:
+  orbit-network:
+    driver: bridge
+  
+
+volumes:
+  app-data-local-postgres:
+  app-data-local-redis:
+  pgadmin-data:
