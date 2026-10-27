@@ -49,7 +49,7 @@ services:
     env_file:
       - ./apps/api/.env
 
-    command: redis-server --save 20 1 --loglevel warning --requirepass redispass  
+    command: redis-server --save 20 1 --loglevel warning --requirepass "$$REDIS_PASSWORD"  
     ports:
       - "127.0.1.1:6379:6379"
 
@@ -57,12 +57,7 @@ services:
       - app-data-local-redis:/data
 
     healthcheck:
-      test:
-        - CMD-SHELL
-       # - 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG'
-
-        - 'redis-cli -a "$$REDIS_PASSWORD" '
-
+      test: [ "CMD-SHELL", "redis-cli", "--raw" , "incr" , "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
