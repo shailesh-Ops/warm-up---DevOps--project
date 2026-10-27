@@ -3,6 +3,8 @@ services:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
+
+    container_name: orbit-frontend-container
         
 
     ports:
@@ -29,19 +31,50 @@ services:
 
 
 
-    # depends_on:
-    #   backend:
-    #     condition: service_healthy
+    depends_on:
+      backend:
+        condition: service_healthy
 
 
 
-  # backend:
-  #   build:
-  #     context: ./apps/api/
-  #     dockerfile: Dockerfile
+  backend:
+    build:
+      context: ./apps/api/
+      dockerfile: Dockerfile
+
+    container_name: orbit-backend-container
       
-  #   ports:
-  #     - ""
+    ports:
+      - "4000:4000"
+
+    env_file:
+      - path: ./apps/api/.env
+
+    healthcheck:
+      test: ["CMD-SHELL", "npm", "run", "test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - orbit-network
+
+    expose:
+      - "4000"
+      - "9000"
+      - "9000-9095/tcp" # specify port range 
+
+
+    volumes:
+      - /orbit-backend/logs:/app/logs/
+
+    depends_on:
+      - postgres
+      
+
+
+
 
   redis:
     image: redis:8-alpine
@@ -58,7 +91,7 @@ services:
 
     healthcheck:
       test: [ "CMD-SHELL", "redis-cli", "--raw" , "incr" , "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 5
       start_period: 10s
@@ -81,7 +114,7 @@ services:
 
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
+      interval: 12s
       timeout: 3s
       retries: 5
       start_period: 10s
@@ -115,7 +148,7 @@ services:
       - pgadmin-data:/var/lib/pgadmin/
       # - ./servers.json:/pgadmin4/servers.json:ro
 
-    restart: unless-stopped
+    restart: always
 
     depends_on:
       postgres:
@@ -130,5 +163,6 @@ volumes:
   app-data-local-redis:
   pgadmin-data:
   orbit-webapp:
+  orbit-backend:
 
   
