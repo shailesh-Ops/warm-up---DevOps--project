@@ -1,26 +1,51 @@
-
 services:
-
-
-
-  web:
+  frontend:
     build:
       context: ./apps/web
-      
+      dockerfile: Dockerfile
+        
+
+    ports:
+      - "8000:80"
+
+    expose:
+      - "4000"
+      - "8000"
+      - "8080-8085/tcp" # specify port range 
+
+    networks:
+      - orbit-network
+
+    env_file:
+    - path: ./apps/web/.env
+      format: raw  
+        external: true
+
+    configs:
+      nginx_config:
+        file: ./nginx.conf 
+
+    volumes:
+      - orbit-app/:/app/logs/
+
+
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+
+
+
+
+
   redis:
     image: redis:8-alpine
 
     env_file:
       - ./apps/api/.env
 
-    # entrypoint: ["/bin/sh", "-c"]
-
-    # command:
-    #   - |
-    #     set -eu
-    #     : "$${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
-    #     exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes
-
+  
     ports:
       - "127.0.1.1:6379:6379"
 
@@ -40,7 +65,6 @@ services:
       - orbit-network
 
     restart: unless-stopped
-    
 
   postgres:
     image: postgres:18-alpine
@@ -48,14 +72,13 @@ services:
     ports:
       - "127.0.0.1:5433:5432"
 
-
     env_file:
       - ./apps/api/.env
-    
+
     restart: unless-stopped
 
     healthcheck:
-      test: ["CMD-SHELL","pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -64,15 +87,11 @@ services:
     networks:
       - orbit-network
 
-    
     volumes:
       - app-data-local-postgres:/var/lib/postgresql/18/docker
 
-
-          # create databse automatically when start fresh new one container 
+        # create databse automatically when start fresh new one container
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-
-
 
       # UI base Work on postgres DB
 
@@ -92,23 +111,21 @@ services:
 
     volumes:
       - pgadmin-data:/var/lib/pgadmin/
-     # - ./servers.json:/pgadmin4/servers.json:ro
+      # - ./servers.json:/pgadmin4/servers.json:ro
 
     restart: unless-stopped
 
     depends_on:
       postgres:
         condition: service_healthy
-      
-      
-    
 
 networks:
   orbit-network:
     driver: bridge
-  
 
 volumes:
   app-data-local-postgres:
   app-data-local-redis:
   pgadmin-data:
+
+  

@@ -1,22 +1,24 @@
 
-    # developemt stage 
-FROM node:alpine3.23 AS dev 
+        # base common stage 
+FROM node:alpine3.23 AS base 
 
 WORKDIR /app
-
-ENV NODE_ENV=developemt
 
 
 COPY package.*json  ./
 
+        # development stage 
+
+FROM node:26-slim AS dev
+
+
 RUN --mount=type=cache,target=/root/.npm \
-        npm i
+        npm ci
 
-RUN npm run db:migrate
-
-RUN rm -rf /var/lib/apt/list/*
 
 COPY .  .
+
+ENV NODE_ENV=developemt
 
 EXPOSE 4000
 
@@ -24,16 +26,16 @@ CMD [ "npm"  , "start" ]
 
 
 
-FROM node:alpine-slim AS prod 
+FROM node:26-slim AS prod 
 
 WORKDIR /app
 
 USER node
 
-COPY --from=dev --chown=node:node /app/dist/ /app/dist/
+COPY --from=dev --chown=node:node  package.*json  /dist  ./app/ 
 
 ENV NODE_ENV=developemt
 
 EXPOSE 4000
 
-CMD [ "npm", "run", "dev" ]
+CMD [ "npm", "run", "dev" , " -- " , " --host", "0.0.0.0" ]
