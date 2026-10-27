@@ -18,26 +18,30 @@ services:
 
     env_file:
     - path: ./apps/web/.env
-      format: raw  
-        external: true
 
-    configs:
-      nginx_config:
-        file: ./nginx.conf 
+
+    # configs:
+    #   nginx_config:
+    #     file: ./nginx.conf 
 
     volumes:
-      - orbit-app/:/app/logs/
+      - /orbit-webapp/logs:/app/logs/
 
 
 
-    depends_on:
-      backend:
-        condition: service_healthy
+    # depends_on:
+    #   backend:
+    #     condition: service_healthy
 
 
 
-
-
+  # backend:
+  #   build:
+  #     context: ./apps/api/
+  #     dockerfile: Dockerfile
+      
+  #   ports:
+  #     - ""
 
   redis:
     image: redis:8-alpine
@@ -45,7 +49,7 @@ services:
     env_file:
       - ./apps/api/.env
 
-  
+    command: redis-server --save 20 1 --loglevel warning --requirepass redispass  
     ports:
       - "127.0.1.1:6379:6379"
 
@@ -55,7 +59,10 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG'
+       # - 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG'
+
+        - 'redis-cli -a "$$REDIS_PASSWORD" '
+
       interval: 5s
       timeout: 3s
       retries: 5
@@ -127,5 +134,6 @@ volumes:
   app-data-local-postgres:
   app-data-local-redis:
   pgadmin-data:
+  orbit-webapp:
 
   

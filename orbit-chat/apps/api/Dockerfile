@@ -9,9 +9,6 @@ COPY package.*json  ./
 
         # development stage 
 
-FROM node:26-slim AS dev
-
-
 RUN --mount=type=cache,target=/root/.npm \
         npm ci
 
@@ -34,7 +31,7 @@ USER node
 
 COPY --from=dev --chown=node:node  package.*json  /dist  ./app/ 
 
-ENV NODE_ENV=developemt
+ENV NODE_ENV=production
 
 EXPOSE 4000
 
