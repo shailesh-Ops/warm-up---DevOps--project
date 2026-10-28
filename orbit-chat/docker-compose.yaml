@@ -41,10 +41,11 @@ services:
     build:
       context: ./apps/api/
       dockerfile: Dockerfile
+    user: root # this use for permission constrant 
 
     container_name: orbit-backend-container
       
-    entrypoint: ["npm", "i"]
+    # entrypoint: ["npm", "i"]
 
 
     ports:
