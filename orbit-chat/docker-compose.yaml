@@ -8,7 +8,7 @@ services:
         
 
     ports:
-      - "8000:80"
+      - "127.0.0.1:8000:80"
 
     expose:
       - "4000"
@@ -45,17 +45,19 @@ services:
 
     container_name: orbit-backend-container
       
-    # entrypoint: ["npm", "i"]
-
 
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
 
     env_file:
       - path: ./apps/api/.env
 
     healthcheck:
-      test: ["CMD-SHELL", "npm", "run", "test"]
+      test:  
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
       interval: 5s
       timeout: 3s
       retries: 5
@@ -87,17 +89,21 @@ services:
     image: redis:8-alpine
 
     env_file:
-      - ./apps/api/.env
-
+    - ./apps/api/.env
+      
     command: 
       -  sh
       -  -c 
-      - ' exec redis-server --save 20 1 --loglevel warning --requirepass "$${REDIS_PASSWORD}"' 
+      - 'exec redis-server --save 20 1 --loglevel warning --requirepass "$${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"'
+      - " redis-server /usr/local/etc/redis/redis.conf "    # redis configs allows to read over desire point's
+
     ports:
       - "127.0.0.1:6379:6379"
 
     volumes:
       - app-data-local-redis:/data
+
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
 
     healthcheck:
       test:
@@ -119,7 +125,7 @@ services:
     image: postgres:18-alpine
 
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:5433:5433"
 
     env_file:
       - ./apps/api/.env
@@ -171,6 +177,11 @@ services:
 networks:
   orbit-network:
     driver: bridge
+
+configs:
+  redis_config:
+    external: true
+
 
 volumes:
   app-data-local-postgres:
