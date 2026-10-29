@@ -19,11 +19,24 @@ docker-compose-build:
     @echo "..........ON DISATTECH MOD BUILD....."
     docker compose up -d --build
     @echo ".....................................ATTENTION HERE..............................................................."
-    @echo "NOTE:>> use >> {{  docker compose down -v  }} << for down entire service yet the time ........."
+    @echo "NOTE:>> use >>   docker compose down -v  << for down entire service yet the time ........."
 
 
-[group('prod')]
-deploy-stage:
-    @echo "deploy webapp on AWS"
 
+alias status-ps := docker-compose-status
+[group('Docker-compose -- status check')]
+docker-compose-status:
+    @echo "ATTENTION :>> DOCKER-COMPOSE STATUS  <<..."
+    @echo "............................................................................."
+    docker compose ps 
+    @echo ".....................................COMPLETED..............................................................."
+
+
+alias status := docker-status
+[group('Docker-- status check')]
+docker-status:
+    @echo "ATTENTION :>> DOCKER STATUS <<..."
+    @echo "............................................................................."
+    docker ps 
+    @echo ".....................................COMPLETED..............................................................."
 
