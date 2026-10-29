@@ -125,7 +125,7 @@ services:
     image: postgres:18-alpine
 
     ports:
-      - "127.0.0.1:5433:5433"
+      - "127.0.0.1:5433:5432"
 
     env_file:
       - ./apps/api/.env
@@ -148,9 +148,9 @@ services:
         # create databse automatically when start fresh new one container
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
-      # UI base Work on postgres DB
+      
 
-  pgadmin4:
+  pgadmin4:        # UI base Work on postgres DB
     image: dpage/pgadmin4
 
     entrypoint: /entrypoint.sh
