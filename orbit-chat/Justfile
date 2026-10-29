@@ -1,0 +1,29 @@
+alias build := docker-build
+alias up-entire := docker-compose-build
+
+[group('Artifact')]
+docker-build:
+    @echo "ATTENTION :>>  FRONTEND  BACKEND BOTH IMAGE CREATION START..."
+    @echo "FRONTEND BUILD....."
+    docker build -t frontend ./apps/web/.
+    @echo "FRONTEND IMAGE DONE ........................................................"
+    @echo "BACKEND BUILD......" 
+    docker build -t backend ./apps/api/.
+    @echo "BACKEND IMAGE DONE ........................................................"
+
+[group('Docker-compose up')]
+docker-compose-build:
+    @echo "ATTENTION :>>  FRONTEND  BACKEND  DATABASE CACHE-DB DB-UI  UP ON JUST DOCKER-COMPOSE USE IT FOR UP ALL THING'S"
+    @echo "............................................................................."
+    @echo "DOCKER COMPOSE UP "
+    @echo "..........ON DISATTECH MOD BUILD....."
+    docker compose up -d --build
+    @echo ".....................................ATTENTION HERE..............................................................."
+    @echo "NOTE:>> use >> {{  docker compose down -v  }} << for down entire service yet the time ........."
+
+
+[group('prod')]
+deploy-stage:
+    @echo "deploy webapp on AWS"
+
+
