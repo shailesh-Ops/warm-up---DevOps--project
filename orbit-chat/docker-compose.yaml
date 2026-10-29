@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
 
     container_name: orbit-frontend-container
-        
+    
 
     ports:
       - "8000:80"
@@ -21,21 +21,21 @@ services:
     env_file:
     - path: ./apps/web/.env
 
+      
 
-    # configs:
-    #   nginx_config:
-    #     file: ./nginx.conf 
-
+    
     volumes:
       - /orbit-webapp/logs:/app/logs/
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
 
-
+    restart: on-failure
 
     depends_on:
       backend:
         condition: service_healthy
 
 
+# ---------------------------------------------------------------------------------------------------------------------------------
 
   backend:
     build:
@@ -45,13 +45,12 @@ services:
 
     container_name: orbit-backend-container
       
-
     ports:
       - "4000:4000"
 
     env_file:
       - path: ./apps/api/.env
-
+    
     healthcheck:
       test:  
         - CMD
@@ -71,6 +70,7 @@ services:
       - "9000"
       - "9000-9095/tcp" # specify port range 
 
+    restart: on-failure
 
     volumes:
       - /orbit-backend/logs:/app/logs/
@@ -83,6 +83,7 @@ services:
       
 
 
+# ---------------------------------------------------------------------------------------------------------------------------------
 
 
   redis:
@@ -90,6 +91,7 @@ services:
 
     env_file:
     - ./apps/api/.env
+
       
     command: 
       -  sh
@@ -121,6 +123,8 @@ services:
 
     restart: unless-stopped
 
+# ---------------------------------------------------------------------------------------------------------------------------------
+
   postgres:
     image: postgres:18-alpine
 
@@ -149,7 +153,7 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
       
-
+# ---------------------------------------------------------------------------------------------------------------------------------
   pgadmin4:        # UI base Work on postgres DB
     image: dpage/pgadmin4
 
@@ -173,6 +177,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+# ---------------------------------------------------------------------------------------------------------------------------------
+
 
 networks:
   orbit-network:
