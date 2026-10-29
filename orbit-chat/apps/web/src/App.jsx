@@ -141,7 +141,7 @@ function ChatWorkspace({ user, setUser }) {
     socketRef.current?.emit('conversation:join', conversationId);
   }
   async function signOut() {
-    try { await api('/auth/logout', { method:'POST' }); socketRef.current?.disconnect(); setUser(null); }
+    try { await api('/logout', { method:'POST' }); socketRef.current?.disconnect(); setUser(null); }
     catch (e) { setError(e.message); }
   }
   async function leaveGroup() {
@@ -175,8 +175,18 @@ function ChatWorkspace({ user, setUser }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
-  useEffect(() => { let alive = true; api('/auth/me').then(r => { if (alive) setUser(r.user); }).catch(() => {}).finally(() => { if (alive) setChecking(false); }); return () => { alive = false; }; }, []);
+  const [serverNotice, setServerNotice] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    setChecking(true); setServerNotice('');
+    api('/me')
+      .then(r => { if (alive) setUser(r.user); })
+      .catch(e => { if (alive && e.network) setServerNotice(e.message); })   // 401 just means "not signed in yet"
+      .finally(() => { if (alive) setChecking(false); });
+    return () => { alive = false; };
+  }, [attempt]);
   if (checking) return <Loading full/>;
-  if (!user) return <AuthScreen onAuthenticated={setUser}/>;
+  if (!user) return <AuthScreen onAuthenticated={setUser} serverNotice={serverNotice} onRetry={() => setAttempt(n => n + 1)}/>;
   return <ChatWorkspace user={user} setUser={setUser}/>;
 }
