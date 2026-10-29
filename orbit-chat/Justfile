@@ -1,3 +1,9 @@
+
+default:
+    @just --choose
+
+
+
 alias build := docker-build
 alias up-entire := docker-compose-build
 
@@ -40,3 +46,15 @@ docker-status:
     docker ps 
     @echo ".....................................COMPLETED..............................................................."
 
+
+# alias status := docker-status
+# [group('Docker-- status check')]
+
+
+# [doc('Build stuff')]
+# build:
+#   ./bin/build
+
+# [doc]
+# test:
+#   ./bin/test
