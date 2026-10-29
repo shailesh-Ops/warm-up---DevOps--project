@@ -71,7 +71,7 @@ Copy-Item apps/web/.env.example apps/web/.env
 node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 ```
 
-The defaults expect PostgreSQL on `127.0.0.1:5432`, Redis on `127.0.0.1:6379`, frontend on `localhost:5173` and API on `localhost:4000`. Set these appropriately for your machine. If Redis uses a password, `REDIS_URL` can be `redis://:YOUR_URL_ENCODED_PASSWORD@127.0.0.1:6379` (do not commit passwords).
+The defaults expect PostgreSQL on `127.0.0.1:5432`, Redis on `127.0.0.1:6379`, frontend on `localhost:5173` and API on `localhost:4000`. Set these appropriately for your machine. **`WEB_ORIGIN` must contain every address the web app is opened from** (comma-separated, e.g. `http://localhost:5173,http://localhost:8000`). If Redis uses a password, `REDIS_URL` can be `redis://:YOUR_URL_ENCODED_PASSWORD@127.0.0.1:6379` (do not commit passwords).
 
 **4. Create the empty PostgreSQL database** (using a PostgreSQL user permitted to create databases):
 
@@ -82,6 +82,8 @@ psql -U postgres -c "CREATE DATABASE orbit_chat;"
 If you have already created it, skip this command. For PostgreSQL with non-`postgres` credentials, adjust `DATABASE_URL` and database creation accordingly.
 
 **5. Initialize the application tables**
+
+The API creates/updates its tables automatically on start (`AUTO_MIGRATE=1`). To run it by hand instead:
 
 ```bash
 npm run db:migrate
@@ -103,12 +105,27 @@ Open **http://localhost:5173**. Register user A. Open an incognito/private brows
 |---|---|
 | `npm run dev` | Both apps with watchers |
 | `npm run start:api` | Start API without a file watcher |
-| `npm run db:migrate` | Apply idempotent schema creation |
+| `npm run db:migrate` | Apply pending SQL migrations (also runs automatically when the API starts) |
+| `npm run test:integration -w apps/api` | Live API test (register/login, CORS, chat, real-time) against a running API + PostgreSQL + Redis |
 | `npm run build` | Compile frontend static assets into `apps/web/dist` |
 | `npm run check` | Run Node tests + frontend production build |
 | `npm run test -w apps/api` | Run API validation tests |
 
 The `/api/health` endpoint checks both PostgreSQL and Redis, returning `{ "ok": true }` when connected.
+
+## Auth endpoints
+
+`POST /api/register`, `POST /api/login`, `POST /api/logout`, `GET /api/me` (the older `/api/auth/*` paths still work). Full contract: `docs/API.md`.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| Browser console: `blocked by CORS policy: No 'Access-Control-Allow-Origin' header` | The web app's address is not in `WEB_ORIGIN` in `apps/api/.env`. Add it (e.g. `http://localhost:8000`), restart the API. The API log prints `Blocked browser origin …` naming the exact value to add. |
+| Login page shows "Can't reach the Orbit server…" | API not running, wrong `VITE_API_URL`, or the CORS case above. |
+| `Something went wrong` on register with a brand-new database | Tables missing. Make sure `AUTO_MIGRATE` is not `0`, or run `npm run db:migrate`. |
+| Signed in but refresh logs you out | Session cookie not stored: check `COOKIE_SECURE` (use `auto` or `0` on plain HTTP) and that the web app and API are on the same site (e.g. both `localhost`). |
+| `Too many attempts` | More than 20 failed sign-ins in 15 minutes from one IP; wait or restart the API (limits are in memory). |
 
 ## Monorepo overview
 
@@ -118,13 +135,15 @@ orbit-chat/
 │   ├── api/
 │   │   ├── .env.example             # App connection settings (template)
 │   │   ├── sql/001_init.sql         # Relational tables + indexes
-│   │   ├── scripts/migrate.js       # Schema initializer
+│   │   ├── scripts/migrate.js       # Manual migration command
 │   │   ├── src/
 │   │   │   ├── server.js             # Express + socket server
 │   │   │   ├── routes.js             # HTTP endpoints + access checks
 │   │   │   ├── socket.js             # Live events + membership rooms
 │   │   │   ├── session.js            # Redis-backed auth sessions
 │   │   │   ├── validation.js         # Zod request validators
+│   │   │   ├── origins.js            # WEB_ORIGIN parsing for CORS/CSRF/Socket.IO
+│   │   │   ├── migrate.js            # Auto-migration runner (schema_migrations)
 │   │   │   ├── database.js           # PostgreSQL pool
 │   │   │   └── redis.js              # Redis client
 │   │   └── tests/validation.test.js

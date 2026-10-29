@@ -2,12 +2,12 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import { pool } from './database.js';
-import { cookieName, establishSession, requireAuth } from './session.js';
+import { clearCookieOptions, cookieName, establishSession, requireAuth } from './session.js';
 import { authLogin, authRegister, conversationCreate, messageCreate, messageCursor, profileUpdate, publicUser, reactionCreate, uuidParam, validate } from './validation.js';
 import { disconnectSession, emitToConversation, emitToUser, isOnline, notifyConversation, subscribeUserToConversation, unsubscribeUserFromConversation } from './socket.js';
 
 const router = Router();
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 12, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many attempts. Try again later.' } });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, skipSuccessfulRequests: true, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many attempts. Try again later.' } });
 const messageLimiter = rateLimit({ windowMs: 60 * 1000, limit: 90, keyGenerator: req => req.session.userId, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'You are sending messages too quickly.' } });
 const COLORS = ['#6C63E6', '#F38A79', '#42A99D', '#D39C4C', '#6588C4', '#AF7AB6'];
 const userFields = 'id,name,email,avatar_color,bio,status,created_at,last_seen_at';
@@ -38,7 +38,8 @@ async function ensureMessageOwner(messageId, userId) {
   return rows[0];
 }
 
-router.post('/auth/register', authLimiter, wrap(async (req, res) => {
+// /register, /login, /logout and /me are the primary paths; the older /auth/* paths keep working as aliases.
+router.post(['/register', '/auth/register'], authLimiter, wrap(async (req, res) => {
   const { name, email, password } = validate(authRegister, req.body);
   const hash = await bcrypt.hash(password, 12);
   try {
@@ -51,7 +52,7 @@ router.post('/auth/register', authLimiter, wrap(async (req, res) => {
   }
 }));
 
-router.post('/auth/login', authLimiter, wrap(async (req, res) => {
+router.post(['/login', '/auth/login'], authLimiter, wrap(async (req, res) => {
   const { email, password } = validate(authLogin, req.body);
   const { rows } = await pool.query(`SELECT ${userFields},password_hash FROM users WHERE lower(email)=$1`, [email]);
   const user = rows[0];
@@ -61,14 +62,17 @@ router.post('/auth/login', authLimiter, wrap(async (req, res) => {
   await establishSession(req, user.id);
   res.json({ user: { ...publicUser(user), email: user.email } });
 }));
-router.post('/auth/logout', requireAuth, wrap(async (req, res) => {
-  const sessionId = req.sessionID;
-  await new Promise((resolve, reject) => req.session.destroy(err => err ? reject(err) : resolve()));
-  disconnectSession(sessionId);
-  res.clearCookie(cookieName, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/' });
+router.post(['/logout', '/auth/logout'], wrap(async (req, res) => {
+  // Idempotent: signing out with an expired or missing session still succeeds and clears the cookie.
+  if (req.session?.userId) {
+    const sessionId = req.sessionID;
+    await new Promise((resolve, reject) => req.session.destroy(err => err ? reject(err) : resolve()));
+    disconnectSession(sessionId);
+  }
+  res.clearCookie(cookieName, clearCookieOptions(req));
   res.status(204).end();
 }));
-router.get('/auth/me', requireAuth, wrap(async (req, res) => {
+router.get(['/me', '/auth/me'], requireAuth, wrap(async (req, res) => {
   const { rows } = await pool.query(`SELECT ${userFields} FROM users WHERE id=$1`, [req.session.userId]);
   if (!rows[0]) return res.status(401).json({ error: 'Session user not found.' });
   res.json({ user: { ...publicUser(rows[0]), email: rows[0].email } });

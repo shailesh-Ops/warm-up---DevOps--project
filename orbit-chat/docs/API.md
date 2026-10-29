@@ -1,18 +1,27 @@
 # HTTP and real-time API contract
 
-Base URL: `/api`. JSON request and response bodies; the frontend uses `credentials: 'include'`, with the Redis-backed browser session cookie. All endpoints except register/login/health need a valid session. Errors are `{ "error": "Human-readable message" }`; unknown or internal failures return a safe 500 response.
+Base URL: `/api`. JSON request and response bodies; the frontend uses `credentials: 'include'`, with the Redis-backed browser session cookie. All endpoints except register/login/logout/health need a valid session. The web app's origin must be listed in the API's `WEB_ORIGIN` setting (comma-separated), otherwise browsers block the calls with a CORS error. Errors are `{ "error": "Human-readable message" }`; unknown or internal failures return a safe 500 response.
 
 ## Authentication and profile
 
 | HTTP | Path | Request | Response |
 |---|---|---|---|
-| POST | `/auth/register` | `{name,email,password}` | `201 {user}` |
-| POST | `/auth/login` | `{email,password}` | `200 {user}` |
-| POST | `/auth/logout` | none | `204` |
-| GET | `/auth/me` | — | `{user}` |
+| POST | `/register` | `{name,email,password}` | `201 {user}` (also signs you in) |
+| POST | `/login` | `{email,password}` | `200 {user}` |
+| POST | `/logout` | none | `204` (works even if the session already expired) |
+| GET | `/me` | — | `{user}` or `401` |
 | PATCH | `/me` | `{name?,bio?,status?}` | `{user}` |
 | GET | `/users?search=alex` | — | `{users:[…]}` (up to 30) |
 | GET | `/health` | — | `{ok:true}` or `503 {ok:false}` |
+
+The older `/auth/register`, `/auth/login`, `/auth/logout` and `/auth/me` paths remain as aliases of the four routes above. `GET /api` returns a small index of the main endpoints.
+
+Quick check from a terminal:
+
+```bash
+curl -i -X POST http://localhost:4000/api/register -H 'Content-Type: application/json' \
+  -d '{"name":"Ada","email":"ada@example.com","password":"correct-horse-battery"}'
+```
 
 `name`: 2–60 characters. Email is normalized lowercase and unique case-insensitively; password: 10–128 characters, limited to 72 UTF-8 bytes because bcrypt is used. Profiles return `id,name,email,avatarColor,bio,status,lastSeenAt,createdAt`. User discovery does not reveal email addresses.
 
@@ -71,4 +80,4 @@ Client connects to the same origin as API, with session cookie. Unauthorized con
 | Server → client | `profile:updated` | user object (own sessions) |
 | Server → client | `profile:changed` | `{userId}` (shared conversation members) |
 
-API HTTP statuses: `400` invalid data; `401` unauthenticated; `403` forbidden action/origin; `404` no access or not found; `409` conflict; `429` excess auth attempts; `500` internal issue; `503` dependency health degraded.
+API HTTP statuses: `400` invalid data (the `error` text is user-friendly, e.g. "Password must be at least 10 characters."); `401` unauthenticated; `403` forbidden action/origin; `404` no access or not found; `409` conflict; `429` too many failed auth attempts (successful logins do not count); `500` internal issue; `503` dependency health degraded.
