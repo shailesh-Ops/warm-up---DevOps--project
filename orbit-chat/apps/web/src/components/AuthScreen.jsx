@@ -3,7 +3,7 @@ import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, MessageCircle, ShieldCheck,
 import { api } from '../lib/api';
 import { Avatar, Logo } from './Shared';
 
-export default function AuthScreen({ onAuthenticated }) {
+export default function AuthScreen({ onAuthenticated, serverNotice = '', onRetry }) {
   const [mode, setMode] = useState('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -15,7 +15,7 @@ export default function AuthScreen({ onAuthenticated }) {
   async function submit(e) {
     e.preventDefault(); setError(''); setBusy(true);
     try {
-      const result = await api(`/auth/${register ? 'register' : 'login'}`, { method:'POST', body: register ? { name, email, password } : { email, password } });
+      const result = await api(register ? '/register' : '/login', { method:'POST', body: register ? { name, email, password } : { email, password } });
       onAuthenticated(result.user);
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
@@ -35,6 +35,7 @@ export default function AuthScreen({ onAuthenticated }) {
           <div><div className="flex items-center justify-between"><label htmlFor="password" className="field-label">Password</label>{register && <span className="mb-2 text-xs text-slate-400">At least 10 characters</span>}</div>
             <div className="relative"><LockKeyhole size={18} className="input-leading-icon" /><input id="password" className="input-field pl-12 pr-12" type={visible ? 'text' : 'password'} placeholder="Enter your password" autoComplete={register ? 'new-password' : 'current-password'} value={password} onChange={e => setPassword(e.target.value)} minLength={register ? 10 : 1} maxLength={128} required />
               <button className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:text-slate-700" type="button" aria-label={visible ? 'Hide password' : 'Show password'} onClick={() => setVisible(v => !v)}>{visible ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div></div>
+          {serverNotice && !error && <div role="alert" className="rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">{serverNotice}{onRetry && <button type="button" onClick={onRetry} className="ml-2 font-bold underline">Try again</button>}</div>}
           {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-600">{error}</p>}
           <button type="submit" disabled={busy} className="primary-button mt-1 w-full justify-center py-[15px] text-[15px]">{busy ? 'One moment…' : register ? 'Create your account' : 'Sign in to Orbit'} <ArrowRight size={18}/></button>
         </form>
