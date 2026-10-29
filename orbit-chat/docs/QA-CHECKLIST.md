@@ -9,6 +9,8 @@
 - [ ] Create `orbit_chat` in PostgreSQL and run `npm run db:migrate`.
 - [ ] Start PostgreSQL and Redis. Verify `npm run dev` starts both apps.
 - [ ] Check API `http://localhost:4000/api/health` returns `{ "ok": true }`.
+- [ ] With the API running, `npm run test:integration -w apps/api` passes (register/login, CORS, chat, real-time).
+- [ ] Open the web app from every address listed in `WEB_ORIGIN`; the browser console shows no CORS errors.
 - [ ] Run `npm run check` (API tests + Vite production build).
 
 ## Accounts
@@ -54,4 +56,4 @@
 
 ## Known verification status of this delivered source
 
-The source was authored in an execution environment without npm package downloads or active PostgreSQL/Redis test services. Node's built-in syntax checker was applied to backend JavaScript. Live application integration, frontend bundling, actual user flows and cross-browser QA are **not verified here**. Please execute the above checklist after `npm install` on your machine; defects found there should be addressed before describing a release as production-ready.
+API unit tests (`npm test -w apps/api`), the frontend production build, and the live API integration test (`npm run test:integration -w apps/api`: register/login/logout on both path styles, CORS allow/deny, direct chat, unread counts, real-time Socket.IO delivery, automatic schema creation on an empty database) were run against PostgreSQL 16 and Redis. Browser-level UI testing, cross-browser QA and the manual checklist above are still to be done by you before any release.
