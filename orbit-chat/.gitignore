@@ -7,5 +7,5 @@ dist/
 .DS_Store
 coverage/
 .vite/
-redis*.conf
-nginx*.conf
+# redis*.conf
+# nginx*.conf
