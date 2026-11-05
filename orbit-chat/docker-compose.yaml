@@ -124,13 +124,7 @@ services:
 
   postgres:
     image: postgres:18-alpine
-    environment:
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_password
       
-    secrets:
-      - db_password
-
-
     ports:
       - "5433:5432"
 
@@ -150,10 +144,10 @@ services:
       - orbit-network
 
     volumes:
-      - app-data-local-postgres:/var/lib/postgresql/18/docker
+      - ./postgres-local/data:/var/lib/postgresql/18/data
 
         # create databse automatically when start fresh new one container
-      - ./init.sql/:/docker-entrypoint-initdb.d/init.sql
+      - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql
 
       
 # --------------------------------------------------pgadmin4-------------------------------------------------------------------------------
@@ -191,13 +185,9 @@ networks:
 configs:
   redis_config:
     external: true
-
-secrets:
-  db_password:
-    file: ./db_password.txt
-
+    
 volumes:
-  app-data-local-postgres:
+  postgres-local:
   app-data-local-redis:
   pgadmin-data:
   orbit-webapp:
