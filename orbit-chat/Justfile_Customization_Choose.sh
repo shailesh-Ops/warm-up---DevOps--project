@@ -34,10 +34,6 @@ case $CHOOSE in
         ;;
 esac
 
-# Safely reload shell configuration if it exists
-if [ -f ~/.bashrc ]; then
-    source ~/.bashrc
-fi
 
 echo "fzf installation completed successfully!"
 
@@ -63,3 +59,23 @@ else
 
 fi
 echo "................................................................................. "
+
+EXTRIME_NEEDED="/etc/skel/.bashrc"
+EXTRIME_NEEDED2="/etc/skel/.profile"
+if [ ! -s  ~/.bashrc ]; then
+    echo "Your ~/.bashrc is missing or empty. Restoring from system skeleton..."
+    cp /etc/skel/.bashrc ~/.bashrc
+    cp /etc/skel/.profile ~/.profile
+
+    echo ".............. System profiles restored .........................."
+
+else
+    echo "Your base ~/.bashrc and ~/.profile look intact."
+
+fi
+
+
+# Safely reload shell configuration if it exists
+if [ -f ~/.bashrc ]; then
+    source ~/.bashrc
+fi
