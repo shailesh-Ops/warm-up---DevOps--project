@@ -125,7 +125,7 @@ services:
 
   postgres:
     image: postgres:18-alpine
-
+      
     ports:
       - "5433:5432"
 
@@ -145,10 +145,10 @@ services:
       - orbit-network
 
     volumes:
-      - app-data-local-postgres:/var/lib/postgresql/18/docker
+      - ./postgres-local/data:/var/lib/postgresql/18/data
 
         # create databse automatically when start fresh new one container
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql
 
       
 # --------------------------------------------------pgadmin4-------------------------------------------------------------------------------
@@ -186,10 +186,9 @@ networks:
 configs:
   redis_config:
     external: true
-
-
+    
 volumes:
-  app-data-local-postgres:
+  postgres-local:
   app-data-local-redis:
   pgadmin-data:
   orbit-webapp:
