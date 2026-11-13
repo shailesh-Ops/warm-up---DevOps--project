@@ -1,6 +1,6 @@
 
         # base common stage 
-FROM node:22-alpine3.23 AS base 
+FROM node:22-alpine3.18 AS base 
 
 WORKDIR /app
 
