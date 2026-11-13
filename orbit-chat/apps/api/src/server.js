@@ -1,11 +1,13 @@
 import 'dotenv/config';
-import { createServer } from 'node:http';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { Server as SocketServer } from 'socket.io';
 import { pool } from './database.js';
-import { redis } from './redis.js';
+import { redis, redisSettings } from './redis.js';
+import { buildHttpsConfig, explainRedisTlsError, redirectLocation } from './tls.js';
 import { sessionMiddleware } from './session.js';
 import { initializeSocket } from './socket.js';
 import { buildAllowedOrigins } from './origins.js';
@@ -16,6 +18,21 @@ const { DATABASE_URL, REDIS_URL, SESSION_SECRET, WEB_ORIGIN } = process.env;
 if (!DATABASE_URL || !REDIS_URL || !SESSION_SECRET || SESSION_SECRET.length < 32 || SESSION_SECRET.startsWith('replace-with-') || !WEB_ORIGIN) {
   console.error('Set DATABASE_URL, REDIS_URL, WEB_ORIGIN and a SESSION_SECRET of at least 32 characters. See .env.example.');
   process.exit(1);
+}
+
+// HTTPS is on when HTTPS_KEY_PATH + HTTPS_CERT_PATH are set (see .env.example). Otherwise the API speaks plain HTTP,
+// which is what you want behind a reverse proxy that already terminates TLS (then also set TRUST_PROXY=1).
+let httpsOptions;
+try {
+  httpsOptions = buildHttpsConfig();
+} catch (err) {
+  console.error(`HTTPS configuration: ${err.message}`);
+  process.exit(1);
+}
+const isHttps = Boolean(httpsOptions);
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction && !redisSettings.useTls) {
+  console.warn('REDIS_URL uses plain redis:// in production. Use rediss:// with REDIS_TLS_CA_CERT_PATH so sessions are encrypted in transit.');
 }
 
 const { origins, invalid } = buildAllowedOrigins(WEB_ORIGIN, process.env.NODE_ENV);
@@ -33,7 +50,12 @@ const app = express();
 app.disable('x-powered-by');
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 // The API is meant to be called from a different origin (the web app), so allow cross-origin reads of its responses.
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// HSTS is host-wide (not per port): sending it from a local dev certificate would pin http://localhost for every
+// other dev server too. So it is only sent in production, and only when this process really serves HTTPS.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  strictTransportSecurity: isProduction && isHttps
+}));
 app.use(cors({
   origin: (origin, callback) => {
     if (isAllowedOrigin(origin)) return callback(null, true);
@@ -58,11 +80,17 @@ const apiIndex = {
   docs: 'docs/API.md'
 };
 app.get(['/', '/api'], (_req, res) => res.json(apiIndex));
-app.use(sessionMiddleware);
+// Registered before the session middleware so a health probe never depends on (or touches) the Redis session store.
+const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms).unref())]);
 app.get('/api/health', async (_req, res) => {
-  try { await Promise.all([pool.query('SELECT 1'), redis.ping()]); res.json({ ok: true }); }
-  catch { res.status(503).json({ ok: false }); }
+  try {
+    // While Redis is down node-redis queues commands instead of failing, so check readiness first and bound the wait.
+    if (!redis.isReady) throw new Error('redis not ready');
+    await withTimeout(Promise.all([pool.query('SELECT 1'), redis.ping()]), 3000);
+    res.json({ ok: true });
+  } catch { res.status(503).json({ ok: false }); }
 });
+app.use(sessionMiddleware);
 app.use('/api', routes);
 app.use((_req, res) => res.status(404).json({ error: 'Route not found.' }));
 app.use((err, _req, res, _next) => {
@@ -71,7 +99,7 @@ app.use((err, _req, res, _next) => {
   console.error('API error:', err);
   res.status(err.status && err.status < 500 ? err.status : 500).json({ error: err.status && err.status < 500 ? err.message : 'Something went wrong. Please try again.' });
 });
-const httpServer = createServer(app);
+const httpServer = isHttps ? createHttpsServer(httpsOptions, app) : createHttpServer(app);
 const io = new SocketServer(httpServer, {
   cors: { origin: origins, credentials: true },
   allowRequest: (req, callback) => callback(null, isAllowedOrigin(req.headers.origin)),
@@ -93,27 +121,72 @@ async function withRetry(label, task, attempts = 15, delayMs = 2000) {
   }
 }
 
+// Optional: a second, plain-HTTP port that only redirects to HTTPS (HTTP_REDIRECT_PORT + PUBLIC_URL=https://host:port).
+let redirectServer;
+const redirectPort = Number(process.env.HTTP_REDIRECT_PORT || 0);
+if (redirectPort) {
+  if (!isHttps || !process.env.PUBLIC_URL) {
+    console.error('HTTP_REDIRECT_PORT needs HTTPS enabled and PUBLIC_URL set to the public https:// address of this API.');
+    process.exit(1);
+  }
+  redirectServer = createHttpServer((req, res) => {
+    res.writeHead(308, { Location: redirectLocation(process.env.PUBLIC_URL, req.url) }).end();
+  });
+}
+
 try {
-  await Promise.race([redis.connect(), sleep(30_000).then(() => { throw new Error('Redis unreachable: timed out after 30s'); })]);
+  // node-redis retries forever. That is right once the API is running, but at startup a certificate mistake
+  // (untrusted CA, wrong name, expired) can never fix itself, so stop immediately instead of waiting 30 seconds.
+  let lastRedisError;
+  const redisReady = new Promise((resolve, reject) => {
+    const onError = err => {
+      lastRedisError = err;
+      const explanation = explainRedisTlsError(err);
+      if (explanation) reject(new Error(explanation));
+    };
+    redis.on('error', onError);
+    redis.connect().then(resolve, reject).finally(() => redis.off('error', onError));
+  });
+  let redisTimer;
+  await Promise.race([
+    redisReady,
+    new Promise((_, reject) => {
+      const hint = lastRedisError?.code === 'ECONNRESET'
+        ? ' Redis closed the connection: if it only accepts TLS, use rediss:// (plus a client certificate if it requires mTLS).'
+        : '';
+      redisTimer = setTimeout(() => reject(new Error(`Redis unreachable: timed out after 30s${lastRedisError ? ` (last error: ${lastRedisError.message})` : ''}.${hint}`)), 30_000);
+    })
+  ]).finally(() => clearTimeout(redisTimer));
+  console.log(`Redis connected (${redisSettings.displayUrl}, ${redisSettings.useTls ? `TLS${redisSettings.mutualTls ? ' + client certificate' : ''}` : 'no TLS'}).`);
   await withRetry('PostgreSQL', () => pool.query('SELECT 1'));
   if (process.env.AUTO_MIGRATE !== '0') {
     const applied = await runMigrations(pool);
     console.log(applied.length ? `Database migrations applied: ${applied.join(', ')}` : 'Database schema is up to date.');
   }
   const port = Number(process.env.PORT || 4000);
+  const listenFailed = (label, listenPort) => err => {
+    console.error(err.code === 'EADDRINUSE' ? `${label} port ${listenPort} is already in use.` : `${label} server: ${err.message}`);
+    process.exit(1);
+  };
+  httpServer.once('error', listenFailed('API', port));
+  redirectServer?.once('error', listenFailed('HTTP redirect', redirectPort));
   httpServer.listen(port, () => {
-    console.log(`Orbit API listening on http://localhost:${port}`);
+    console.log(`Orbit API listening on ${isHttps ? 'https' : 'http'}://localhost:${port} (${isHttps ? `TLS ${httpsOptions.minVersion}+` : 'plain HTTP'})`);
     console.log(`Allowed web origins: ${origins.join(', ')}`);
   });
+  redirectServer?.listen(redirectPort, () => console.log(`HTTP :${redirectPort} redirects to ${process.env.PUBLIC_URL}`));
 } catch (err) {
   console.error('Startup failed:', err.message);
-  await redis.quit().catch(() => {});
+  // quit() waits for a connection that may never come (that is how this branch is usually reached), so only use it when connected.
+  if (redis.isReady) await redis.quit().catch(() => {});
+  else { try { redis.destroy(); } catch { /* already closed */ } }
   await pool.end().catch(() => {});
   process.exit(1);
 }
 async function stop() {
   io.close();
   httpServer.close();
+  redirectServer?.close();
   await Promise.allSettled([redis.quit(), pool.end()]);
   process.exit(0);
 }
