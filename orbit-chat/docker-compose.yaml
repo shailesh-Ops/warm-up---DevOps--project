@@ -6,7 +6,8 @@ services:
 
     container_name: orbit-frontend-container
 
-    profiles: [frontend, webapp, app]
+    # profiles: 
+    #   - app # as per needed use it
     
 
     ports:
@@ -45,7 +46,8 @@ services:
 
     container_name: orbit-backend-container
 
-    profiles: [backend, api, sensitive] # docker compose --profile backend, api, sensitive  up -d  or up 
+    # profiles: 
+    #   - app  # docker compose --profile app up -d  or up 
 
     ports:
       - "4000:4000"
@@ -88,14 +90,10 @@ services:
   redis:
     image: redis:8-alpine
 
-    profiles: [redis ]    # docker compose --profile redis up -d  or up 
-
     env_file:
     - ./apps/api/.env
 
     pids_limit: 300
-    platform: redis
-
 
     command: 
       - sh
@@ -139,8 +137,6 @@ services:
 
   postgres:
     image: postgres:18-alpine
-    profiles:
-      - DB 
 
     ports:
       - "5433:5432"
@@ -169,9 +165,7 @@ services:
 # --------------------------------------------------pgadmin4-------------------------------------------------------------------------------
   pgadmin4:        # UI base Work on postgres DB
     image: dpage/pgadmin4
-    profiles:
-      - admin-view
-
+  
     ports:
       - "8080:8080"
 
