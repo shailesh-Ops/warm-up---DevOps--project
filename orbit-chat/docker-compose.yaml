@@ -5,6 +5,9 @@ services:
       dockerfile: Dockerfile
 
     container_name: orbit-frontend-container
+
+    # profiles: 
+    #   - app # as per needed use it
     
 
     ports:
@@ -24,7 +27,7 @@ services:
 
     volumes:
       - /orbit-webapp/logs:/app/logs/
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./apps/web/nginx.conf:/etc/nginx/conf.d/default.conf
 
     restart: on-failure
 
@@ -39,10 +42,13 @@ services:
     build:
       context: ./apps/api/
       dockerfile: Dockerfile
-    user: root # this use for permission constrant 
+    # user: root # this use for permission constrant 
 
     container_name: orbit-backend-container
-      
+
+    # profiles: 
+    #   - app  # docker compose --profile app up -d  or up 
+
     ports:
       - "4000:4000"
 
@@ -50,11 +56,7 @@ services:
       - path: ./apps/api/.env
     
     healthcheck:
-      test:  
-        - CMD
-        - node
-        - -e
-        - "fetch('http://localhost:4000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      test: ["CMD", "node", "scripts/healthcheck.js"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -71,7 +73,8 @@ services:
     restart: on-failure
 
     volumes:
-      - /orbit-backend/logs:/app/logs/
+      - ./logs/backend:/app/logs
+      - ./certs/ca.crt:/certs/ca.crt:ro
 
     depends_on:
       postgres:
@@ -90,27 +93,36 @@ services:
     env_file:
     - ./apps/api/.env
 
-      
+    pids_limit: 300
+
     command: 
-      -  sh
-      -  -c 
-      - 'exec redis-server --save 20 1 --loglevel warning --requirepass "$${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"'
-      - " redis-server /usr/local/etc/redis/redis.conf "    # redis configs allows to read over desire point's
+      - sh
+      - -c
+      - |
+        : "$${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+        exec redis-server \
+          --port 0 \
+          --tls-port 6379 \
+          --tls-cert-file /certs/redis.crt \
+          --tls-key-file /certs/redis.key \
+          --tls-ca-cert-file /certs/ca.crt \
+          --tls-auth-clients no \
+          --requirepass "$$REDIS_PASSWORD" \
+          --appendonly yes
 
     ports:
       - "6379:6379"
 
     volumes:
-      - app-data-local-redis:/data
+      - redis-data:/data
+      - ./certs/ca.crt:/certs/ca.crt:ro
+      - ./certs/redis.crt:/certs/redis.crt:ro
+      - ./certs/redis.key:/certs/redis.key:ro
 
       - ./redis.conf:/usr/local/etc/redis/redis.conf
 
     healthcheck:
-      test:
-
-        - CMD-SHELL
-        - 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping | grep -q PONG'
-
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli --tls --cacert /certs/ca.crt -h localhost -p 6379 ping | grep -qx PONG']
       interval: 10s
       timeout: 3s
       retries: 5
@@ -125,7 +137,7 @@ services:
 
   postgres:
     image: postgres:18-alpine
-      
+
     ports:
       - "5433:5432"
 
@@ -145,8 +157,7 @@ services:
       - orbit-network
 
     volumes:
-      - ./postgres-local/data:/var/lib/postgresql/18/data
-
+      - postgres_data:/var/lib/postgresql
         # create databse automatically when start fresh new one container
       - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql
 
@@ -154,9 +165,7 @@ services:
 # --------------------------------------------------pgadmin4-------------------------------------------------------------------------------
   pgadmin4:        # UI base Work on postgres DB
     image: dpage/pgadmin4
-
-    entrypoint: /entrypoint.sh
-
+  
     ports:
       - "8080:8080"
 
@@ -188,10 +197,10 @@ configs:
     external: true
     
 volumes:
-  postgres-local:
-  app-data-local-redis:
+  postgres_data:
+  redis-data:
   pgadmin-data:
   orbit-webapp:
-  orbit-backend:
+  logs:
 
   

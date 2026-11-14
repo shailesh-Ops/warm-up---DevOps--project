@@ -13,9 +13,11 @@ alias up-entire := docker-compose-build
 alias status-ps := docker-compose-status
 alias status := docker-status
 alias setup := justfile-require-setup
+alias up :=  docker-compose-up
+alias c := clear 
+alias down := docker-compose-down
 
-
-
+[group("DOCKER__&&__DOCKER-COMPOSE")]
 [group("Artifact")]
 docker-build:
     @echo "ATTENTION :>> FRONTEND BACKEND BOTH IMAGE CREATION START..."
@@ -26,20 +28,30 @@ docker-build:
     docker build -t backend ./apps/api/.
     @echo "BACKEND IMAGE DONE ........................................................"
 
-
-
-[group("Docker-compose up")]
+[group("DOCKER__&&__DOCKER-COMPOSE")]
+[group("Docker-compose up with build ")]
 docker-compose-build:
-    @echo "ATTENTION :>> FRONTEND BACKEND DATABASE CACHE-DB DB-UI UP ON JUST DOCKER-COMPOSE USE IT FOR UP ALL THING S"
+    @echo "ATTENTION :>> FRONTEND BACKEND DATABASE CACHE-DB DB-UI UP ON JUST DOCKER-COMPOSE USE IT FOR UP  AND BUILD ALL THING S"
     @echo "............................................................................"
-    @echo "DOCKER COMPOSE UP"
+    @echo "DOCKER COMPOSE UP WITH BUILD"
     @echo "..........ON DETACH MODE BUILD....."
     docker compose up -d --build
     @echo ".....................................ATTENTION HERE..............................................................."
     @echo "NOTE:>> use >> docker compose down -v << for down entire service yet the time ........."
 
+[group("DOCKER__&&__DOCKER-COMPOSE")]
+[group("Docker-compose up only ")]
+docker-compose-up:
+    @echo "ATTENTION :>> FRONTEND BACKEND DATABASE CACHE-DB DB-UI UP ON JUST DOCKER-COMPOSE USE IT FOR UP ALL THING S"
+    @echo "............................................................................"
+    @echo "DOCKER COMPOSE UP ONLY" 
+    @echo "..........ON DETACH MODE UP....."
+    docker compose up -d 
+    @echo ".....................................ATTENTION HERE..............................................................."
+    @echo "NOTE:>> use >> docker compose down -v << for down entire service yet the time ........."
 
 
+[group("DOCKER__&&__DOCKER-COMPOSE")]
 [group("Docker-compose -- status check")]
 docker-compose-status:
     @echo "ATTENTION :>> DOCKER-COMPOSE STATUS <<..."
@@ -48,7 +60,17 @@ docker-compose-status:
     @echo ".....................................COMPLETED............................................................"
 
 
+[group("DOCKER__&&__DOCKER-COMPOSE")]
+[group("Docker-compose -- ENTIRE DOWN")]
+[doc("DELETE , DOWN , ENTIRE PROCESS STOP USE IT")]
+docker-compose-down:
+    @echo "ATTENTION :>> DOCKER-COMPOSE DOWN <<..."
+    @echo "............................................................................"
+    docker compose down -v  --remove-orphans
+    @echo ".....................................COMPLETED............................................................"
 
+
+[group("DOCKER__&&__DOCKER-COMPOSE")]
 [group("Docker-- status check")]
 docker-status:
     @echo "ATTENTION :>> DOCKER STATUS <<..."
@@ -68,4 +90,10 @@ justfile-require-setup:
     echo "ATTENTION :>> JUSTFILE SET-UP <<..."
     ./Justfile_Customization_Choose.sh
     echo "ATTENTION :>> JUSTFILE SET-UP DONE>>>>>>>>>..."
+
+
+[group("CLEAR-TERMINAL")]
+[doc("CLEAR TERMINAL ALL OUTPUT'S")]
+clear: 
+    clear
 
