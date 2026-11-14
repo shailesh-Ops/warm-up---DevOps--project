@@ -15,7 +15,7 @@ alias status := docker-status
 alias setup := justfile-require-setup
 alias up :=  docker-compose-up
 alias c := clear 
-
+alias down := docker-compose-down
 
 [group("DOCKER__&&__DOCKER-COMPOSE")]
 [group("Artifact")]
@@ -57,6 +57,16 @@ docker-compose-status:
     @echo "ATTENTION :>> DOCKER-COMPOSE STATUS <<..."
     @echo "............................................................................"
     docker compose ps
+    @echo ".....................................COMPLETED............................................................"
+
+
+[group("DOCKER__&&__DOCKER-COMPOSE")]
+[group("Docker-compose -- ENTIRE DOWN")]
+[doc("DELETE , DOWN , ENTIRE PROCESS STOP USE IT")]
+docker-compose-down:
+    @echo "ATTENTION :>> DOCKER-COMPOSE DOWN <<..."
+    @echo "............................................................................"
+    docker compose down -v  --remove-orphans
     @echo ".....................................COMPLETED............................................................"
 
 
