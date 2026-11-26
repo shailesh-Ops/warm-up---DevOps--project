@@ -24,7 +24,7 @@ jobs:
             node-version: '22'
             cache: npm
 
-      - name: INSTALL DEPENDENCIES
+      - name: INSTALL DEPENDENCIE'S
         run: npm ci
 
       - name: npm build project
