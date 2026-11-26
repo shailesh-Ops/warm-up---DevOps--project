@@ -1,4 +1,4 @@
-name: ci
+name: ORBIT CI PART IS BING... BUILD, TEST , SCAN THEN PUSH TO REGISTY 
 
 # stages:
 #   - build
@@ -9,6 +9,7 @@ on:
   push:
     branches: 
       - main 
+  pull_request:
 
 jobs:
   build:
@@ -17,9 +18,17 @@ jobs:
       - name: code check
         uses: actions/checkout@v6
 
-      - name: demo run
-        run: echo "hello it's set perfect..."
+      - name: SET UP NODE.JS 20.19.0
+        uses: actions/setup-node@v4
+        with:
+            node-version: '22'
+            cache: npm
 
+      - name: INSTALL DEPENDENCIES
+        run: npm ci
+
+      - name: npm build project
+        run: npm run build 
         
   # docker:
   #   runs-on: ubuntu-latest
