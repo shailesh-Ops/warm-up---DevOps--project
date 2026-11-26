@@ -10,6 +10,12 @@ on:
     branches: 
       - main 
   pull_request:
+    branches:
+      - main
+
+
+
+   working_directory: ./orbit-chat
 
 jobs:
   build:
@@ -25,6 +31,7 @@ jobs:
             cache: npm
 
       - name: INSTALL DEPENDENCIE'S
+        working-directory: ./orbit-chat
         run: npm ci
 
       - name: npm build project
