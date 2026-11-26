@@ -13,13 +13,12 @@ on:
     branches:
       - main
 
-
-
-   working_directory: ./orbit-chat
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./orbit-chat
     steps:
       - name: code check
         uses: actions/checkout@v6
