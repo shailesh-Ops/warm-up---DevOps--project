@@ -31,10 +31,11 @@ jobs:
             cache: npm
 
       - name: INSTALL DEPENDENCIE'S
-        working-directory: ./orbit-chat
+        working-directory: ./orbit-chat/apps/web
         run: npm ci
 
       - name: npm build project
+        working-directory: ./orbit-chat/apps/web
         run: npm run build 
         
   # docker:
